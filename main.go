@@ -50,6 +50,8 @@ func main() {
 		Prefork: true,
 		//JSONEncoder: sonic.Marshal,
 		//JSONDecoder: sonic.Unmarshal,
+		JSONEncoder: sonic.Marshal,
+		JSONDecoder: sonic.Unmarshal,
 	})
 
 	app.Use(recover.New())
