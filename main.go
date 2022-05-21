@@ -2,8 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/bytedance/sonic"
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"io"
 	"log"
@@ -48,14 +48,12 @@ func main() {
 
 	app := fiber.New(fiber.Config{
 		Prefork: true,
-		//JSONEncoder: sonic.Marshal,
-		//JSONDecoder: sonic.Unmarshal,
 		JSONEncoder: sonic.Marshal,
 		JSONDecoder: sonic.Unmarshal,
 	})
 
 	app.Use(recover.New())
-	app.Use(logger.New())
+	//app.Use(logger.New())
 
 	appGroup := app.Group("/api/v2")
 	authRoutes(appGroup)
