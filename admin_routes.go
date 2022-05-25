@@ -16,9 +16,18 @@ var ctx = context.Background()
 
 var ErrAlreadyRebuilding = fiber.Map{"error": "Search index rebuild is already running. Please wait."}
 
+var ErrUserNotFound = fiber.Map{"error": "User not found."}
+var ErrUserAlreadyBlacklisted = fiber.Map{"error": "User is already blacklisted."}
+var ErrUserIsNotBlacklisted = fiber.Map{"error": "User is not blacklisted."}
+
 func adminRoutes(router fiber.Router) {
 	router.Post("/admin/rebuild_search_index", EnforceAdminSecret, RebuildSearchIndex)
 	router.Get("/admin/rebuild_search_index/status", EnforceAdminSecret, RebuildSearchIndexStatus)
+
+	router.Post("/admin/reset_user_pin", EnforceAdminSecret, ResetUserPin)
+
+	router.Post("/admin/blacklist_author", EnforceAdminSecret, BlacklistAvatarAuthor)
+	router.Delete("/admin/blacklist_author", EnforceAdminSecret, UnBlacklistAvatarAuthor)
 }
 
 func EnforceAdminSecret(c *fiber.Ctx) error {
@@ -38,6 +47,126 @@ func EnforceAdminSecret(c *fiber.Ctx) error {
 	return c.Next()
 }
 
+func ResetUserPin(c *fiber.Ctx) error {
+	var r GenericUserRequest
+	var u models.User
+
+	if err := c.BodyParser(&r); err != nil {
+		return c.Status(http.StatusBadRequest).JSON(ErrInvalidRequestBody)
+	}
+
+	tx := DatabaseConnection.Where("user_id = ?", r.UserId).First(&u)
+
+	if tx.Error != gorm.ErrRecordNotFound {
+		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+	} else if tx.Error == gorm.ErrRecordNotFound {
+		return c.Status(http.StatusBadRequest).JSON(ErrUserNotFound)
+	}
+
+	u.UserPin = ""
+
+	tx = DatabaseConnection.Save(&u)
+
+	if tx.Error != nil {
+		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+	}
+
+	return c.Status(http.StatusOK).JSON(fiber.Map{})
+}
+
+func UnBlacklistAvatarAuthor(c *fiber.Ctx) error {
+	var r GenericUserRequest
+	var b models.BlacklistedAuthor
+
+	if err := c.BodyParser(&r); err != nil {
+		return c.Status(http.StatusBadRequest).JSON(ErrInvalidRequestBody)
+	}
+
+	tx := DatabaseConnection.Where("user_id = ?", r.UserId).First(&b)
+
+	if tx.Error != gorm.ErrRecordNotFound {
+		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+	} else if tx.Error == gorm.ErrRecordNotFound {
+		return c.Status(http.StatusBadRequest).JSON(ErrUserIsNotBlacklisted)
+	}
+
+	tx = DatabaseConnection.Delete(&b)
+
+	if tx.Error != nil {
+		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+	}
+
+	var a []models.Avatar
+
+	tx = DatabaseConnection.Where("avatar_author_id = ?", r.UserId).Find(&a)
+
+	if tx.Error != gorm.ErrRecordNotFound {
+		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+	}
+
+	for _, avatar := range a {
+		l := *avatar.GetLimitedAvatar()
+		res, err := ReJsonClient.JSONSet(l.AvatarId, "$", l)
+
+		if err != redis.Nil {
+			fmt.Println(err)
+		}
+
+		if res.(string) != "OK" {
+			fmt.Printf("Error adding avatar to search index: %s\n", l.AvatarId)
+		}
+	}
+
+	return c.Status(http.StatusOK).JSON(fiber.Map{})
+}
+
+func BlacklistAvatarAuthor(c *fiber.Ctx) error {
+	var r GenericUserRequest
+	var b models.BlacklistedAuthor
+
+	if err := c.BodyParser(&r); err != nil {
+		return c.Status(http.StatusBadRequest).JSON(ErrInvalidRequestBody)
+	}
+
+	tx := DatabaseConnection.Where("user_id = ?", r.UserId).First(&b)
+
+	if tx.Error == gorm.ErrRecordNotFound {
+		tx = DatabaseConnection.Create(&models.BlacklistedAuthor{
+			UserId: r.UserId,
+		})
+
+		if tx.Error != nil {
+			return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+		}
+	} else {
+		return c.Status(http.StatusBadRequest).JSON(ErrUserAlreadyBlacklisted)
+	}
+
+	var a []models.Avatar
+
+	tx = DatabaseConnection.Where("avatar_author_id = ?", r.UserId).Find(&a)
+
+	if tx.Error == gorm.ErrRecordNotFound {
+		return c.Status(http.StatusOK).JSON(fiber.Map{})
+	} else if tx.Error != nil {
+		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+	}
+
+	for _, avatar := range a {
+		res, err := ReJsonClient.JSONDel(avatar.AvatarIdSha256, "$")
+
+		if err != redis.Nil {
+			return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+		}
+
+		if res.(string) != "OK" {
+			return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+		}
+	}
+
+	return c.Status(http.StatusOK).JSON(fiber.Map{})
+}
+
 func RebuildSearchIndex(c *fiber.Ctx) error {
 	var a []models.Avatar
 
@@ -55,6 +184,14 @@ func RebuildSearchIndex(c *fiber.Ctx) error {
 	go func() {
 		RedisConnection.Set(ctx, "rebuild_search_index", 0, 0)
 
+		var b []models.BlacklistedAuthor
+
+		tx := DatabaseConnection.Find(&b)
+
+		if tx.Error != nil {
+			return
+		}
+
 		DatabaseConnection.Where("avatar_public = ?", "t").FindInBatches(&a, 1000, func(tx *gorm.DB, batch int) error {
 			l := make([]models.LimitedAvatar, len(a))
 			i := 0
@@ -65,9 +202,21 @@ func RebuildSearchIndex(c *fiber.Ctx) error {
 			}
 
 			for _, v := range l {
+				shouldIndex := true
+				for _, b := range b {
+					if v.AvatarAuthorId == b.UserId {
+						shouldIndex = false
+						break
+					}
+				}
+
+				if !shouldIndex {
+					continue
+				}
+
 				res, err := ReJsonClient.JSONSet(v.AvatarId, "$", v)
 
-				if err != nil {
+				if err != redis.Nil {
 					fmt.Println(err)
 				}
 

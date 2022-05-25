@@ -39,3 +39,9 @@ type AvatarExportResponse struct {
 	AvatarId   string `json:"avatar_id"`
 	AvatarName string `json:"avatar_name"`
 }
+
+// Admin Request Models
+
+type GenericUserRequest struct {
+	UserId string `json:"user_id"`
+}

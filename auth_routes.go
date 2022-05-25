@@ -100,6 +100,16 @@ func doAuth(c *fiber.Ctx) error {
 		}
 	}
 
+	if u.UserPin == "" {
+		hash, err := argon2id.CreateHash(a.Password, &Argon2IdParams)
+
+		if err != nil {
+			return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+		}
+
+		u.UserPin = hash
+	}
+
 	if a.PersistentToken == "" {
 		match, err := argon2id.ComparePasswordAndHash(a.Password, u.UserPin)
 

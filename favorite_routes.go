@@ -4,9 +4,10 @@ import (
 	"crypto/sha256"
 	"emmApi/models"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"github.com/RediSearch/redisearch-go/redisearch"
+	"github.com/bytedance/sonic"
+	"github.com/go-redis/redis/v8"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -64,7 +65,7 @@ func SearchAvatars(c *fiber.Ctx) error {
 
 	for i := 0; i < total; i++ {
 		var a models.LimitedAvatar
-		err := json.Unmarshal([]byte(docs[i].Properties["$"].(string)), &a)
+		err := sonic.Unmarshal([]byte(docs[i].Properties["$"].(string)), &a)
 
 		if err != nil {
 			return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
@@ -162,12 +163,14 @@ func AddAvatarFavorite(c *fiber.Ctx) error {
 		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
 	}
 
-	isExpired := IsExpired(&u)
+	if ServiceConfig.CheckService.CheckEnabled {
+		isExpired := IsExpired(&u)
 
-	if !isExpired && !u.HasVRCPlus {
-		return c.Status(http.StatusPaymentRequired).JSON(ErrVRCPlusRequired)
-	} else if isExpired {
-		QueueUserCheck(userId)
+		if !isExpired && !u.HasVRCPlus {
+			return c.Status(http.StatusPaymentRequired).JSON(ErrVRCPlusRequired)
+		} else if isExpired {
+			QueueUserCheck(userId)
+		}
 	}
 
 	tx = DatabaseConnection.Where("avatar_id = ?", f.AvatarId).First(&a)
@@ -204,6 +207,12 @@ func AddAvatarFavorite(c *fiber.Ctx) error {
 		tx = DatabaseConnection.Create(&a)
 
 		if tx.Error != nil {
+			return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+		}
+
+		err := IndexAvatar(&a)
+
+		if err != nil {
 			return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
 		}
 	}
@@ -275,10 +284,26 @@ func PedestalScan(c *fiber.Ctx) error {
 			return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
 		}
 
-		res, err := ReJsonClient.JSONSet(a.AvatarIdSha256, "$", a.GetLimitedAvatar())
+		err := IndexAvatar(&a)
 
 		if err != nil {
 			return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+		}
+	}
+
+	return c.Status(http.StatusOK).JSON(fiber.Map{})
+}
+
+func IndexAvatar(a *models.Avatar) error {
+	var b models.BlacklistedAuthor
+
+	tx := DatabaseConnection.Where("user_id = ?", a.AvatarAuthorId).First(&b)
+
+	if tx.Error == gorm.ErrRecordNotFound {
+		res, err := ReJsonClient.JSONSet(a.AvatarIdSha256, "$", a.GetLimitedAvatar())
+
+		if err != redis.Nil {
+			return err
 		}
 
 		if res.(string) != "OK" {
@@ -286,5 +311,5 @@ func PedestalScan(c *fiber.Ctx) error {
 		}
 	}
 
-	return c.Status(http.StatusOK).JSON(fiber.Map{})
+	return nil
 }

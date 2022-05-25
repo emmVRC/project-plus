@@ -54,6 +54,11 @@ func SetupDatabaseConnection() {
 		fmt.Println(err)
 	}
 
+	err = db.AutoMigrate(&models.BlacklistedAuthor{})
+	if err != nil {
+		fmt.Println(err)
+	}
+
 	err = db.AutoMigrate(&models.PersistentToken{})
 	if err != nil {
 		fmt.Println(err)
