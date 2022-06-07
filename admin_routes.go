@@ -27,6 +27,7 @@ func adminRoutes(router fiber.Router) {
 
 	router.Post("/admin/reset_user_pin", EnforceAdminSecret, ResetUserPin)
 	router.Post("/admin/export_user_favorites", EnforceAdminSecret, ExportFavoritesAdmin)
+	router.Delete("/admin/delete_user", EnforceAdminSecret, DeleteUser)
 
 	router.Post("/admin/blacklist_author", EnforceAdminSecret, BlacklistAvatarAuthor)
 	router.Delete("/admin/blacklist_author", EnforceAdminSecret, UnBlacklistAvatarAuthor)
@@ -47,6 +48,43 @@ func EnforceAdminSecret(c *fiber.Ctx) error {
 	}
 
 	return c.Next()
+}
+
+func DeleteUser(c *fiber.Ctx) error {
+	var r GenericUserRequest
+	var u models.User
+
+	if err := c.BodyParser(&r); err != nil {
+		return c.Status(http.StatusBadRequest).JSON(ErrInvalidRequestBody)
+	}
+
+	tx := DatabaseConnection.Where("user_id = ?", r.UserId).First(&u)
+
+	if tx.Error != nil && tx.Error != gorm.ErrRecordNotFound {
+		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+	} else if tx.Error == gorm.ErrRecordNotFound {
+		return c.Status(http.StatusBadRequest).JSON(ErrUserNotFound)
+	}
+
+	tx = DatabaseConnection.Where("user_id = ?", r.UserId).Delete(&models.AvatarFavorite{})
+
+	if tx.Error != nil {
+		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+	}
+
+	tx = DatabaseConnection.Where("user_id = ?", r.UserId).Delete(&models.PersistentToken{})
+
+	if tx.Error != nil {
+		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+	}
+
+	tx = DatabaseConnection.Delete(&u)
+
+	if tx.Error != nil {
+		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+	}
+
+	return c.Status(http.StatusNoContent).JSON(fiber.Map{})
 }
 
 func ExportFavoritesAdmin(c *fiber.Ctx) error {
