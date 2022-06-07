@@ -103,7 +103,7 @@ func ExportFavorites(c *fiber.Ctx) error {
 		}
 	}
 
-	return c.JSON(avatars)
+	return c.JSON(export)
 }
 
 func GetAvatarFavorites(c *fiber.Ctx) error {

@@ -47,7 +47,7 @@ func main() {
 	SetupRedisConnection()
 
 	app := fiber.New(fiber.Config{
-		Prefork: true,
+		Prefork:     true,
 		JSONEncoder: sonic.Marshal,
 		JSONDecoder: sonic.Unmarshal,
 	})

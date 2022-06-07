@@ -96,6 +96,12 @@ func doAuth(c *fiber.Ctx) error {
 		if err == nil {
 			return c.Status(http.StatusUpgradeRequired).JSON(ErrPasswordResetRequired)
 		} else {
+			err = bcrypt.CompareHashAndPassword([]byte(u.UserId), []byte(a.Password))
+
+			if err == nil {
+				return c.Status(http.StatusUpgradeRequired).JSON(ErrPasswordResetRequired)
+			}
+
 			return c.Status(http.StatusUnauthorized).JSON(ErrInvalidPassword)
 		}
 	}

@@ -11,7 +11,6 @@ type AvatarFavorite struct {
 	AvatarId  string  `gorm:"foreignKey:AvatarId"`
 	Avatar    *Avatar `gorm:"references:AvatarId"`
 	CreatedAt time.Time
-	UpdatedAt time.Time
 }
 
 type BlacklistedAuthor struct {

@@ -7,6 +7,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"net/http"
 	"strconv"
 	"strings"
@@ -25,6 +26,7 @@ func adminRoutes(router fiber.Router) {
 	router.Get("/admin/rebuild_search_index/status", EnforceAdminSecret, RebuildSearchIndexStatus)
 
 	router.Post("/admin/reset_user_pin", EnforceAdminSecret, ResetUserPin)
+	router.Post("/admin/export_user_favorites", EnforceAdminSecret, ExportFavoritesAdmin)
 
 	router.Post("/admin/blacklist_author", EnforceAdminSecret, BlacklistAvatarAuthor)
 	router.Delete("/admin/blacklist_author", EnforceAdminSecret, UnBlacklistAvatarAuthor)
@@ -47,6 +49,40 @@ func EnforceAdminSecret(c *fiber.Ctx) error {
 	return c.Next()
 }
 
+func ExportFavoritesAdmin(c *fiber.Ctx) error {
+	var r GenericUserRequest
+	var favorites []models.AvatarFavorite
+	var avatars []models.Avatar
+	var export []AvatarExportResponse
+
+	if err := c.BodyParser(&r); err != nil {
+		return c.Status(http.StatusBadRequest).JSON(ErrInvalidRequestBody)
+	}
+
+	tx := DatabaseConnection.Preload(clause.Associations).Where("user_id = ?", r.UserId).Order("id DESC").Find(&favorites)
+
+	if tx.Error != nil {
+		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+	}
+
+	avatars = make([]models.Avatar, len(favorites))
+
+	for i := 0; i < len(favorites); i++ {
+		avatars[i] = *favorites[i].Avatar
+	}
+
+	export = make([]AvatarExportResponse, len(avatars))
+
+	for i := 0; i < len(avatars); i++ {
+		export[i] = AvatarExportResponse{
+			AvatarId:   avatars[i].AvatarId,
+			AvatarName: avatars[i].AvatarName,
+		}
+	}
+
+	return c.JSON(export)
+}
+
 func ResetUserPin(c *fiber.Ctx) error {
 	var r GenericUserRequest
 	var u models.User
@@ -57,7 +93,7 @@ func ResetUserPin(c *fiber.Ctx) error {
 
 	tx := DatabaseConnection.Where("user_id = ?", r.UserId).First(&u)
 
-	if tx.Error != gorm.ErrRecordNotFound {
+	if tx.Error != nil && tx.Error != gorm.ErrRecordNotFound {
 		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
 	} else if tx.Error == gorm.ErrRecordNotFound {
 		return c.Status(http.StatusBadRequest).JSON(ErrUserNotFound)
