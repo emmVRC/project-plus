@@ -223,7 +223,11 @@ func doReset(c *fiber.Ctx) error {
 	err := bcrypt.CompareHashAndPassword([]byte(u.UserPin), []byte(p.Password))
 
 	if err != nil {
-		return c.Status(http.StatusUnauthorized).JSON(ErrInvalidPassword)
+		err = bcrypt.CompareHashAndPassword([]byte(u.UserId), []byte(p.Password))
+
+		if err != nil {
+			return c.Status(http.StatusUnauthorized).JSON(ErrInvalidPassword)
+		}
 	}
 
 	hash, err := argon2id.CreateHash(p.Password, argon2id.DefaultParams)

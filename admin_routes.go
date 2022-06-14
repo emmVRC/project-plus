@@ -29,6 +29,9 @@ func adminRoutes(router fiber.Router) {
 	router.Post("/admin/export_user_favorites", EnforceAdminSecret, ExportFavoritesAdmin)
 	router.Delete("/admin/delete_user", EnforceAdminSecret, DeleteUser)
 
+	router.Get("/admin/avatar/:avatar_id", EnforceAdminSecret, GetAdminAvatar)
+
+	router.Post("/admin/blacklist_avatar", EnforceAdminSecret, BlacklistAvatar)
 	router.Post("/admin/blacklist_author", EnforceAdminSecret, BlacklistAvatarAuthor)
 	router.Delete("/admin/blacklist_author", EnforceAdminSecret, UnBlacklistAvatarAuthor)
 }
@@ -239,6 +242,61 @@ func BlacklistAvatarAuthor(c *fiber.Ctx) error {
 	}
 
 	return c.Status(http.StatusOK).JSON(fiber.Map{})
+}
+
+func BlacklistAvatar(c *fiber.Ctx) error {
+	var r GenericUserRequest
+	var a models.Avatar
+
+	if err := c.BodyParser(&r); err != nil {
+		return c.Status(http.StatusBadRequest).JSON(ErrInvalidRequestBody)
+	}
+
+	tx := DatabaseConnection.Where("avatar_id = ?", r.UserId).First(&a)
+
+	if tx.Error != nil && tx.Error != gorm.ErrRecordNotFound {
+		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+	} else if tx.Error == gorm.ErrRecordNotFound {
+		return c.Status(http.StatusNotFound).JSON(fiber.Map{})
+	}
+
+	a.AvatarPublic = false
+
+	tx = DatabaseConnection.Save(&a)
+
+	if tx.Error != nil {
+		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+	}
+
+	res, err := ReJsonClient.JSONDel(a.AvatarIdSha256, "$")
+
+	if err != redis.Nil {
+		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+	}
+
+	if res.(string) != "OK" {
+		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+	}
+
+	return c.Status(http.StatusOK).JSON(fiber.Map{})
+}
+
+func GetAdminAvatar(c *fiber.Ctx) error {
+	var a models.Avatar
+
+	if c.Params("avatar_id") == "" {
+		return c.Status(http.StatusBadRequest).JSON(ErrInvalidRequestBody)
+	}
+
+	tx := DatabaseConnection.Where("avatar_id = ?", c.Params("avatar_id")).First(&a)
+
+	if tx.Error != nil && tx.Error != gorm.ErrRecordNotFound {
+		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+	} else if tx.Error == gorm.ErrRecordNotFound {
+		return c.Status(http.StatusNotFound).JSON(fiber.Map{})
+	}
+
+	return c.Status(http.StatusOK).JSON(a)
 }
 
 func RebuildSearchIndex(c *fiber.Ctx) error {

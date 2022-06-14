@@ -39,7 +39,9 @@ func favoriteRoutes(router fiber.Router) {
 func GetAvatar(c *fiber.Ctx) error {
 	var a models.Avatar
 
-	tx := DatabaseConnection.Where("avatar_id_sha256 = ?", c.Params("hash")).First(&a)
+	avatarId := c.Params("hash")
+
+	tx := DatabaseConnection.Where("avatar_id = ? OR avatar_id_sha256 = ?", avatarId, avatarId).First(&a)
 
 	if tx.Error != nil {
 		return c.Status(http.StatusNotFound).JSON(ErrAvatarNotFound)
