@@ -137,7 +137,7 @@ func ResetUserPin(c *fiber.Ctx) error {
 	if tx.Error != nil && tx.Error != gorm.ErrRecordNotFound {
 		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
 	} else if tx.Error == gorm.ErrRecordNotFound {
-		return c.Status(http.StatusBadRequest).JSON(ErrUserNotFound)
+		return c.Status(http.StatusNotFound).JSON(ErrUserNotFound)
 	}
 
 	u.UserPin = ""
