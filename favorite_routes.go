@@ -135,7 +135,9 @@ func DeleteAvatarFavorite(c *fiber.Ctx) error {
 		return c.Status(http.StatusBadRequest).JSON(ErrInvalidRequestBody)
 	}
 
-	tx := DatabaseConnection.Where("avatar_id = ?", f.AvatarId).First(&a)
+	userId := c.Locals("userId").(string)
+
+	tx := DatabaseConnection.Where("user_id = ? AND avatar_id = ?", userId, f.AvatarId).First(&a)
 
 	if tx.Error == nil {
 		tx = DatabaseConnection.Delete(&a)
