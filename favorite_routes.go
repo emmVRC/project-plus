@@ -110,7 +110,8 @@ func ExportFavorites(c *fiber.Ctx) error {
 
 func GetAvatarFavorites(c *fiber.Ctx) error {
 	var favorites []models.AvatarFavorite
-	var avatars []models.Avatar
+	//goland:noinspection GoPreferNilSlice
+	var avatars = []models.Avatar{}
 
 	tx := DatabaseConnection.Preload(clause.Associations).Where("user_id = ?", c.Locals("userId").(string)).Order("id DESC").Find(&favorites)
 
@@ -118,10 +119,16 @@ func GetAvatarFavorites(c *fiber.Ctx) error {
 		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
 	}
 
-	avatars = make([]models.Avatar, len(favorites))
+	userId := c.Locals("userId").(string)
 
 	for i := 0; i < len(favorites); i++ {
-		avatars[i] = *favorites[i].Avatar
+		avatar := *favorites[i].Avatar
+
+		if userId != avatar.AvatarAuthorId && !avatar.AvatarPublic {
+			continue
+		}
+
+		avatars = append(avatars, avatar)
 	}
 
 	return c.JSON(avatars)
