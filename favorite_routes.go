@@ -137,11 +137,11 @@ func DeleteAvatarFavorite(c *fiber.Ctx) error {
 
 	userId := c.Locals("userId").(string)
 
-	tx := DatabaseConnection.Where("user_id = ?", userId).
-		Where("avatar_id = ?", f.AvatarId).First(&a)
+	tx := DatabaseConnection.Where("user_id = ? AND avatar_id = ?", userId, f.AvatarId).First(&a)
 
 	if tx.Error == nil {
-		tx = DatabaseConnection.Delete(&a)
+		//tx = DatabaseConnection.Delete(&a)
+		tx = DatabaseConnection.Unscoped().Delete(&a, "id = ?", a.ID)
 
 		if tx.Error != nil {
 			return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
@@ -243,7 +243,7 @@ func AddAvatarFavorite(c *fiber.Ctx) error {
 		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
 	}
 
-	return c.SendStatus(http.StatusOK)
+	return c.Status(http.StatusOK).JSON(fiber.Map{})
 }
 
 func PedestalScan(c *fiber.Ctx) error {
