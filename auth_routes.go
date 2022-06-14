@@ -230,7 +230,7 @@ func doReset(c *fiber.Ctx) error {
 		}
 	}
 
-	hash, err := argon2id.CreateHash(p.Password, argon2id.DefaultParams)
+	hash, err := argon2id.CreateHash(p.Password, &Argon2IdParams)
 
 	if err != nil {
 		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
