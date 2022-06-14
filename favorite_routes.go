@@ -145,9 +145,11 @@ func DeleteAvatarFavorite(c *fiber.Ctx) error {
 		if tx.Error != nil {
 			return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
 		}
+	} else {
+		return c.Status(http.StatusNotFound).JSON(ErrAvatarNotFound)
 	}
 
-	return c.SendStatus(http.StatusOK)
+	return c.Status(http.StatusOK).JSON(fiber.Map{})
 }
 
 func AddAvatarFavorite(c *fiber.Ctx) error {
