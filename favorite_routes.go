@@ -137,7 +137,8 @@ func DeleteAvatarFavorite(c *fiber.Ctx) error {
 
 	userId := c.Locals("userId").(string)
 
-	tx := DatabaseConnection.Where("user_id = ? AND avatar_id = ?", userId, f.AvatarId).First(&a)
+	tx := DatabaseConnection.Where("user_id = ?", userId).
+		Where("avatar_id = ?", f.AvatarId).First(&a)
 
 	if tx.Error == nil {
 		tx = DatabaseConnection.Delete(&a)
