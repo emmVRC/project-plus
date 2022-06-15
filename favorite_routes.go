@@ -9,7 +9,6 @@ import (
 	"github.com/bytedance/sonic"
 	"github.com/go-redis/redis/v8"
 	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"net/http"
@@ -22,7 +21,7 @@ var AssetUrlRegex = regexp.MustCompile(`^(https?:\/\/)(api\.vrchat\.cloud|dbinj8
 var ErrResourceSharingConflict = fiber.Map{"error": "Resource sharing conflict."}
 var ErrAvatarNotFound = fiber.Map{"error": "Avatar not found."}
 var ErrInvalidAssetUrl = fiber.Map{"error": "Invalid asset URL."}
-var ErrVRCPlusRequired = fiber.Map{"error": "VRChat, like emmVRC, relies on the support of their users to keep the platform free. Please support VRChat to unlock these features.\nModification of emmVRC is against emmVRC's Terms of Service."}
+var ErrVRCPlusRequired = fiber.Map{"error": "VRChat, like emmVRC, relies on the support of their users to keep the platform free. Please support VRChat to unlock these features."}
 
 func favoriteRoutes(router fiber.Router) {
 	router.Get("/avatar", JwtRequired, EnforceModeration, GetAvatarFavorites)
@@ -181,21 +180,6 @@ func AddAvatarFavorite(c *fiber.Ctx) error {
 		isExpired := IsExpired(&u)
 
 		if !isExpired && !u.HasVRCPlus {
-			ban := models.Ban{
-				BanId:      fmt.Sprintf("mod_%s", uuid.New()),
-				BanUserId:  userId,
-				BanIssuer:  "srvr_console",
-				BanReason:  "Modified Client Detected",
-				BanUpdated: time.Now(),
-				BanCreated: time.Now(),
-			}
-
-			tx = DatabaseConnection.Create(&ban)
-
-			if tx.Error != nil {
-				return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
-			}
-
 			return c.Status(http.StatusPaymentRequired).JSON(ErrVRCPlusRequired)
 		} else if isExpired {
 			QueueUserCheck(userId)
