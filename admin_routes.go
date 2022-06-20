@@ -232,7 +232,7 @@ func BlacklistAvatarAuthor(c *fiber.Ctx) error {
 	for _, avatar := range a {
 		res, err := ReJsonClient.JSONDel(avatar.AvatarIdSha256, "$")
 
-		if err != redis.Nil {
+		if err != nil {
 			return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
 		}
 
@@ -271,7 +271,7 @@ func BlacklistAvatar(c *fiber.Ctx) error {
 
 	res, err := ReJsonClient.JSONDel(a.AvatarIdSha256, "$")
 
-	if err != redis.Nil {
+	if err != nil {
 		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
 	}
 
