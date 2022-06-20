@@ -31,7 +31,7 @@ func adminRoutes(router fiber.Router) {
 
 	router.Get("/admin/avatar/:avatar_id", EnforceAdminSecret, GetAdminAvatar)
 
-	router.Post("/admin/blacklist_avatar", EnforceAdminSecret, BlacklistAvatar)
+	router.Post("/admin/blacklist_avatar/:avatar_id", EnforceAdminSecret, BlacklistAvatar)
 	router.Post("/admin/blacklist_author", EnforceAdminSecret, BlacklistAvatarAuthor)
 	router.Delete("/admin/blacklist_author", EnforceAdminSecret, UnBlacklistAvatarAuthor)
 }
@@ -245,14 +245,15 @@ func BlacklistAvatarAuthor(c *fiber.Ctx) error {
 }
 
 func BlacklistAvatar(c *fiber.Ctx) error {
-	var r GenericUserRequest
 	var a models.Avatar
 
-	if err := c.BodyParser(&r); err != nil {
+	avatarId := c.Params("avatar_id")
+
+	if avatarId == "" {
 		return c.Status(http.StatusBadRequest).JSON(ErrInvalidRequestBody)
 	}
 
-	tx := DatabaseConnection.Where("avatar_id = ?", r.UserId).First(&a)
+	tx := DatabaseConnection.Where("avatar_id = ?", avatarId).First(&a)
 
 	if tx.Error != nil && tx.Error != gorm.ErrRecordNotFound {
 		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
@@ -284,11 +285,13 @@ func BlacklistAvatar(c *fiber.Ctx) error {
 func GetAdminAvatar(c *fiber.Ctx) error {
 	var a models.Avatar
 
-	if c.Params("avatar_id") == "" {
+	avatarId := c.Params("avatar_id")
+
+	if avatarId == "" {
 		return c.Status(http.StatusBadRequest).JSON(ErrInvalidRequestBody)
 	}
 
-	tx := DatabaseConnection.Where("avatar_id = ?", c.Params("avatar_id")).First(&a)
+	tx := DatabaseConnection.Where("avatar_id = ?", avatarId).First(&a)
 
 	if tx.Error != nil && tx.Error != gorm.ErrRecordNotFound {
 		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
