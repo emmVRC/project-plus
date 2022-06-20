@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/RediSearch/redisearch-go/redisearch"
 	"github.com/bytedance/sonic"
-	"github.com/go-redis/redis/v8"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -315,7 +314,7 @@ func IndexAvatar(a *models.Avatar) error {
 	if tx.Error == gorm.ErrRecordNotFound {
 		res, err := ReJsonClient.JSONSet(a.AvatarIdSha256, "$", a.GetLimitedAvatar())
 
-		if err != redis.Nil {
+		if err != nil {
 			return err
 		}
 
