@@ -235,10 +235,6 @@ func BlacklistAvatarAuthor(c *fiber.Ctx) error {
 		if err != nil {
 			return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
 		}
-
-		if res.(string) != "OK" {
-			return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
-		}
 	}
 
 	return c.Status(http.StatusOK).JSON(fiber.Map{})
@@ -272,10 +268,6 @@ func BlacklistAvatar(c *fiber.Ctx) error {
 	res, err := ReJsonClient.JSONDel(a.AvatarIdSha256, "$")
 
 	if err != nil {
-		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
-	}
-
-	if res.(string) != "OK" {
 		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
 	}
 
