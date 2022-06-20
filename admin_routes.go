@@ -185,7 +185,7 @@ func UnBlacklistAvatarAuthor(c *fiber.Ctx) error {
 		l := *avatar.GetLimitedAvatar()
 		res, err := ReJsonClient.JSONSet(l.AvatarId, "$", l)
 
-		if err != redis.Nil {
+		if err != nil {
 			fmt.Println(err)
 		}
 
@@ -351,7 +351,7 @@ func RebuildSearchIndex(c *fiber.Ctx) error {
 
 				res, err := ReJsonClient.JSONSet(v.AvatarId, "$", v)
 
-				if err != redis.Nil {
+				if err != nil {
 					fmt.Println(err)
 				}
 
