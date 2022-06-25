@@ -45,3 +45,8 @@ type AvatarExportResponse struct {
 type GenericUserRequest struct {
 	UserId string `json:"user_id"`
 }
+
+type TransferRequest struct {
+	UserId       string `json:"user_id"`
+	TargetUserId string `json:"target_user_id"`
+}

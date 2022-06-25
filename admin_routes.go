@@ -27,6 +27,8 @@ func adminRoutes(router fiber.Router) {
 
 	router.Post("/admin/reset_user_pin", EnforceAdminSecret, ResetUserPin)
 	router.Post("/admin/export_user_favorites", EnforceAdminSecret, ExportFavoritesAdmin)
+	router.Post("/admin/wipe_user_favorites", EnforceAdminSecret, WipeUserFavorites)
+	router.Post("/admin/transfer_user_favorites", EnforceAdminSecret, TransferUserFavorites)
 	router.Delete("/admin/delete_user", EnforceAdminSecret, DeleteUser)
 
 	router.Get("/admin/avatar/:avatar_id", EnforceAdminSecret, GetAdminAvatar)
@@ -122,6 +124,54 @@ func ExportFavoritesAdmin(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(export)
+}
+
+func WipeUserFavorites(c *fiber.Ctx) error {
+	var r GenericUserRequest
+
+	if err := c.BodyParser(&r); err != nil {
+		return c.Status(http.StatusBadRequest).JSON(ErrInvalidRequestBody)
+	}
+
+	tx := DatabaseConnection.Where("user_id = ?", r.UserId).Delete(&models.AvatarFavorite{})
+
+	if tx.Error != nil && tx.Error != gorm.ErrRecordNotFound {
+		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+	}
+
+	return c.Status(http.StatusNoContent).JSON(fiber.Map{})
+}
+
+func TransferUserFavorites(c *fiber.Ctx) error {
+	var t TransferRequest
+	var favorite []models.AvatarFavorite
+
+	if err := c.BodyParser(&t); err != nil {
+		return c.Status(http.StatusBadRequest).JSON(ErrInvalidRequestBody)
+	}
+
+	tx := DatabaseConnection.Where("user_id = ?", t.TargetUserId).Delete(&models.AvatarFavorite{})
+
+	if tx.Error != nil && tx.Error != gorm.ErrRecordNotFound {
+		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+	}
+
+	tx = DatabaseConnection.Where("user_id = ?", t.UserId).Find(&favorite)
+
+	if tx.Error != nil && tx.Error != gorm.ErrRecordNotFound {
+		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+	}
+
+	for _, f := range favorite {
+		f.UserId = t.TargetUserId
+		tx = DatabaseConnection.Save(&f)
+
+		if tx.Error != nil {
+			return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+		}
+	}
+
+	return c.JSON(fiber.Map{})
 }
 
 func ResetUserPin(c *fiber.Ctx) error {
