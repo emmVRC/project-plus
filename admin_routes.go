@@ -144,13 +144,35 @@ func WipeUserFavorites(c *fiber.Ctx) error {
 
 func TransferUserFavorites(c *fiber.Ctx) error {
 	var t TransferRequest
-	var favorite []models.AvatarFavorite
+	var oFavorite, favorite []models.AvatarFavorite
+
+	var ou, tu models.User
 
 	if err := c.BodyParser(&t); err != nil {
 		return c.Status(http.StatusBadRequest).JSON(ErrInvalidRequestBody)
 	}
 
-	tx := DatabaseConnection.Where("user_id = ?", t.TargetUserId).Delete(&models.AvatarFavorite{})
+	tx := DatabaseConnection.Where("user_id = ?", t.UserId).First(&ou)
+
+	if tx.Error == gorm.ErrRecordNotFound {
+		return c.Status(http.StatusBadRequest).JSON(ErrUserNotFound)
+	} else if tx.Error != nil {
+		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+	}
+
+	tx = DatabaseConnection.Where("user_id = ?", t.TargetUserId).First(&tu)
+
+	if tx.Error == gorm.ErrRecordNotFound {
+		return c.Status(http.StatusBadRequest).JSON(ErrUserNotFound)
+	} else if tx.Error != nil {
+		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+	}
+
+	tx = DatabaseConnection.Where("user_id = ?", t.UserId).Find(&oFavorite)
+
+	if len(oFavorite) == 0 {
+		return c.Status(http.StatusNoContent).JSON(fiber.Map{})
+	}
 
 	if tx.Error != nil && tx.Error != gorm.ErrRecordNotFound {
 		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
