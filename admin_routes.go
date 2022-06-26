@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var ctx = context.Background()
@@ -36,6 +37,8 @@ func adminRoutes(router fiber.Router) {
 	router.Post("/admin/blacklist_avatar/:avatar_id", EnforceAdminSecret, BlacklistAvatar)
 	router.Post("/admin/blacklist_author", EnforceAdminSecret, BlacklistAvatarAuthor)
 	router.Delete("/admin/blacklist_author", EnforceAdminSecret, UnBlacklistAvatarAuthor)
+
+	router.Get("/admin/online_user_count", EnforceAdminSecret, GetOnlineUserCount)
 }
 
 func EnforceAdminSecret(c *fiber.Ctx) error {
@@ -53,6 +56,18 @@ func EnforceAdminSecret(c *fiber.Ctx) error {
 	}
 
 	return c.Next()
+}
+
+func GetOnlineUserCount(c *fiber.Ctx) error {
+	var count int64
+
+	tx := DatabaseConnection.Model(&models.User{}).Where("last_seen > ?", time.Now().Add(-time.Minute*15)).Count(&count)
+
+	if tx.Error != nil {
+		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
+	}
+
+	return c.JSON(fiber.Map{"count": count})
 }
 
 func DeleteUser(c *fiber.Ctx) error {
