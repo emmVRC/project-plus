@@ -91,7 +91,7 @@ func IsExpired(user *models.User) bool {
 		return true
 	}
 
-	if !user.HasVRCPlus && user.LastVRCPlusCheck.Unix() < time.Now().Add(-48*time.Hour).Unix() {
+	if !user.HasVRCPlus && user.LastVRCPlusCheck.Unix() < time.Now().Add(-12*time.Hour).Unix() {
 		return true
 	}
 
