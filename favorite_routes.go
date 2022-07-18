@@ -12,6 +12,7 @@ import (
 	"gorm.io/gorm/clause"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -52,7 +53,10 @@ func GetAvatar(c *fiber.Ctx) error {
 func SearchAvatars(c *fiber.Ctx) error {
 	var l []models.LimitedAvatar
 
-	docs, total, err := RediSearchClient.Search(redisearch.NewQuery(c.Query("q")).Limit(0, 50000))
+	searchTerm := c.Query("q")
+	searchTerm = strings.Replace(searchTerm, "-", "\\-", -1)
+
+	docs, total, err := RediSearchClient.Search(redisearch.NewQuery(searchTerm).Limit(0, 50000))
 
 	if err != nil {
 		return c.Status(http.StatusInternalServerError).JSON(ErrInternalServerError)
